@@ -1,0 +1,133 @@
+package cs;
+
+import robocode.*;
+import java.awt.Color;
+
+public class MID_SQUAD extends AdvancedRobot {
+
+    private boolean angulo = true;
+    private boolean hitByBullet = false;
+    private int consecutiveHits = 0;
+
+    /**
+     * run: MID_SQUAD's default behavior
+     */
+    public void run() {
+        setColors(Color.white, Color.orange, Color.blue); // body, gun, radar
+
+        // Robot main loop
+        while (true) {
+            if (!hitByBullet) {
+                curvedMovement(100, 90);
+                angulo = !angulo; // Alternar entre direções após cada movimento curvo
+            } else {
+                smartEvasion();
+            }
+
+            execute();
+        }
+    }
+
+    private void curvedMovement(int distance, int turnAngle) {
+        double turnIncrement = 10; // Incremento para suavizar a curva
+        for (int i = 0; i < turnAngle; i += turnIncrement) {
+            setAhead(distance);
+            setTurnRight(turnIncrement);
+            setTurnGunRight(turnIncrement);
+            setTurnRadarRight(turnIncrement); // Adiciona varredura contínua do radar
+            execute();
+        }
+    }
+
+    /**
+     * onScannedRobot: What to do when you see another robot
+     */
+    public void onScannedRobot(ScannedRobotEvent e) {
+        double bearing = e.getBearing();
+        double enemyHeading = e.getHeading();
+        double absoluteBearing = getHeading() + bearing;
+        double enemyRelativeHeading = absoluteBearing - enemyHeading;
+
+        if (getOthers() == 1) {
+            // Se há apenas um inimigo restante, atire diretamente contra ele
+            setTurnGunRight(normalizeBearing(bearing - getGunHeading()));
+            fire(3);
+            consecutiveHits++;
+        } else {
+            if (Math.abs(enemyRelativeHeading) <= 90) {
+                if (e.getDistance() < 400) {
+                    fire(3);
+                    consecutiveHits++;
+                }
+            } else {
+                setTurnGunRight(normalizeBearing(bearing - getGunHeading()));
+            }
+        }
+    }
+
+    private double normalizeBearing(double angle) {
+        while (angle > 180) angle -= 360;
+        while (angle < -180) angle += 360;
+        return angle;
+    }
+
+    /**
+     * onHitByBullet: What to do when you're hit by a bullet
+     */
+    public void onHitByBullet(HitByBulletEvent e) {
+        hitByBullet = true;
+        consecutiveHits = 0;
+        smartEvasion();
+    }
+
+    /**
+     * onHitWall: What to do when you hit a wall
+     */
+    public void onHitWall(HitWallEvent e) {
+        reverseDirection();
+        curvedMovement(45, 100);
+    }
+
+    /**
+     * onHitRobot: What to do when you hit another robot
+     */
+    public void onHitRobot(HitRobotEvent e) {
+        double bearing = e.getBearing();
+
+        if (Math.abs(bearing) <= 90) {
+            // Colisão frontal ou lateral, movimento lateral para evitar tiros
+            setBack(50);
+            setTurnRight(90);
+            curvedMovement(50, 90);
+            fire(3);
+            consecutiveHits++;
+        } else {
+            // Colisão pela retaguarda, mira e atira diretamente contra o inimigo
+            setTurnGunRight(normalizeBearing(bearing - getGunHeading()));
+            fire(3);
+            consecutiveHits++;
+        }
+    }
+
+    private void smartEvasion() {
+        double energy = getEnergy();
+
+        if (consecutiveHits >= 3 || energy < 30) {
+            // Se consecutivamente atingido muitas vezes ou com pouca energia, evasão mais agressiva ou defensiva
+            turnRight(180);
+            ahead(200);
+            turnRight(180);
+            consecutiveHits = 0;
+        } else {
+            turnRight(90);
+            ahead(150);
+            turnLeft(90);
+            ahead(150);
+        }
+        hitByBullet = false;
+    }
+
+    private void reverseDirection() {
+        angulo = !angulo;
+    }
+}
