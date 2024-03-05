@@ -2,45 +2,37 @@ package cs;
 
 import robocode.*;
 import java.awt.Color;
+// Mateus, Ingrid and Deryk
 
 public class MID_SQUAD extends AdvancedRobot {
 
     private boolean angulo = true;
     private boolean hitByBullet = false;
     private int consecutiveHits = 0;
+    private double lastEnemyEnergy = 100; // Energia do inimigo no último turno
 
     /**
-     * run: MID_SQUAD's default behavior
+     * run: Comportamento padrão do MID_SQUAD
      */
     public void run() {
-        setColors(Color.white, Color.orange, Color.blue); // body, gun, radar
+        setColors(Color.orange, Color.white, Color.blue); // corpo, arma, radar
 
-        // Robot main loop
+        // Loop principal do robô
         while (true) {
-            if (!hitByBullet) {
-                curvedMovement(100, 90);
-                angulo = !angulo; // Alternar entre direções após cada movimento curvo
-            } else {
-                smartEvasion();
-            }
+            // Movimentação
+            setAhead(150);
+            setTurnRight(90);
+
+            // Atualização do radar
+            setTurnRadarRight(360);
 
             execute();
-        }
-    }
-
-    private void curvedMovement(int distance, int turnAngle) {
-        double turnIncrement = 10; // Incremento para suavizar a curva
-        for (int i = 0; i < turnAngle; i += turnIncrement) {
-            setAhead(distance);
-            setTurnRight(turnIncrement);
-            setTurnGunRight(turnIncrement);
-            setTurnRadarRight(turnIncrement); // Adiciona varredura contínua do radar
-            execute();
+			//Este método é chamado para executar todas as ações especificadas anteriormente. Ele permite que o Robocode processe os comandos e atualize o estado do robô.
         }
     }
 
     /**
-     * onScannedRobot: What to do when you see another robot
+     * onScannedRobot: O que fazer quando você vê outro robô
      */
     public void onScannedRobot(ScannedRobotEvent e) {
         double bearing = e.getBearing();
@@ -48,21 +40,23 @@ public class MID_SQUAD extends AdvancedRobot {
         double absoluteBearing = getHeading() + bearing;
         double enemyRelativeHeading = absoluteBearing - enemyHeading;
 
-        if (getOthers() == 1) {
-            // Se há apenas um inimigo restante, atire diretamente contra ele
-            setTurnGunRight(normalizeBearing(bearing - getGunHeading()));
-            fire(3);
-            consecutiveHits++;
+        // Implementação de mira preditiva
+        double bulletPower = 1 + Math.min(2, Math.max(0, (getEnergy() - 20) / 20));
+        double futureX = getX() + e.getDistance() * Math.sin(Math.toRadians(absoluteBearing + e.getHeading()));
+        double futureY = getY() + e.getDistance() * Math.cos(Math.toRadians(absoluteBearing + e.getHeading()));
+        double absDeg = absoluteBearing + e.getHeading();
+        setTurnGunRight(normalizeBearing(absDeg - getGunHeading()));
+
+        // Verifica se o inimigo está parado ou se a diferença entre os ângulos é pequena
+        if (e.getVelocity() == 0 || Math.abs(enemyRelativeHeading) <= 5) {
+            // Se estiver parado ou em movimento linear, atire com mais precisão
+            setFire(bulletPower);
         } else {
-            if (Math.abs(enemyRelativeHeading) <= 90) {
-                if (e.getDistance() < 400) {
-                    fire(3);
-                    consecutiveHits++;
-                }
-            } else {
-                setTurnGunRight(normalizeBearing(bearing - getGunHeading()));
-            }
+            // Se estiver em movimento circular, atire com menos precisão
+            setFire(0.8 * bulletPower);
         }
+
+        lastEnemyEnergy = e.getEnergy();
     }
 
     private double normalizeBearing(double angle) {
@@ -72,7 +66,7 @@ public class MID_SQUAD extends AdvancedRobot {
     }
 
     /**
-     * onHitByBullet: What to do when you're hit by a bullet
+     * onHitByBullet: O que fazer quando você é atingido por uma bala
      */
     public void onHitByBullet(HitByBulletEvent e) {
         hitByBullet = true;
@@ -81,53 +75,55 @@ public class MID_SQUAD extends AdvancedRobot {
     }
 
     /**
-     * onHitWall: What to do when you hit a wall
+     * onHitWall: O que fazer quando você atinge uma parede
      */
     public void onHitWall(HitWallEvent e) {
         reverseDirection();
-        curvedMovement(45, 100);
     }
 
     /**
-     * onHitRobot: What to do when you hit another robot
+     * onHitRobot: O que fazer quando você atinge outro robô
      */
     public void onHitRobot(HitRobotEvent e) {
-        double bearing = e.getBearing();
+        double bearing = e.getBearing(); //Obtém o ângulo de direção do robô atingido em relação ao meu robô.
 
-        if (Math.abs(bearing) <= 90) {
+        if (Math.abs(bearing) <= 90) { //Verifica se o ângulo de direção absoluto do robô atingido é menor ou igual a 90 graus. Isso indica uma colisão frontal ou lateral.
             // Colisão frontal ou lateral, movimento lateral para evitar tiros
-            setBack(50);
             setTurnRight(90);
-            curvedMovement(50, 90);
+            setAhead(50);
             fire(3);
-            consecutiveHits++;
+            consecutiveHits++; //Incrementa o contador de colisões consecutivas.
         } else {
             // Colisão pela retaguarda, mira e atira diretamente contra o inimigo
             setTurnGunRight(normalizeBearing(bearing - getGunHeading()));
-            fire(3);
-            consecutiveHits++;
+			//Ajusta a mira da arma para apontar diretamente para o robô atingido.
+            setAhead(50);
+            fire(1);
+            consecutiveHits++; ////Incrementa o contador de colisões consecutivas.
         }
     }
 
     private void smartEvasion() {
         double energy = getEnergy();
+		// Obter energia atual do robô
 
-        if (consecutiveHits >= 3 || energy < 30) {
-            // Se consecutivamente atingido muitas vezes ou com pouca energia, evasão mais agressiva ou defensiva
+        if (consecutiveHits >= 3 || energy < 50) {
+            // Se consecutivamente atingido 3 vezes e a energia for menor que 50 , evasão mais defensiva
             turnRight(180);
             ahead(200);
             turnRight(180);
-            consecutiveHits = 0;
+            consecutiveHits = 0; //zera o contador de hits consecutivos
         } else {
             turnRight(90);
             ahead(150);
             turnLeft(90);
             ahead(150);
         }
-        hitByBullet = false;
+        hitByBullet = false; // atualiza para falso após evasão
     }
 
     private void reverseDirection() {
-        angulo = !angulo;
+        angulo = !angulo; 
+		// inverte o angulo de true para false
     }
 }
