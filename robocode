@@ -2,128 +2,76 @@ package cs;
 
 import robocode.*;
 import java.awt.Color;
-// Mateus, Ingrid and Deryk
+//Mateus, Ingrid e Deryk
 
 public class MID_SQUAD extends AdvancedRobot {
 
-    private boolean angulo = true;
-    private boolean hitByBullet = false;
-    private int consecutiveHits = 0;
-    private double lastEnemyEnergy = 100; // Energia do inimigo no último turno
 
-    /**
-     * run: Comportamento padrão do MID_SQUAD
-     */
-    public void run() {
-        setColors(Color.orange, Color.white, Color.blue); // corpo, arma, radar
+	boolean peek; // Não virar se tiver um robô
+	double moveAmount; // Quanto mover
 
-        // Loop principal do robô
-        while (true) {
-            // Movimentação
-            setAhead(150);
-            setTurnRight(90);
+	/**
+	 * run: Move ao redor das paredes
+	 */
+	public void run() {
+		setColors(Color.magenta, Color.magenta, Color.magenta); // corpo, arma, radar
 
-            // Atualização do radar
-            setTurnRadarRight(360);
+		// Inicializa moveAmount para o máximo possível para este campo de batalha.
+		moveAmount = Math.max(getBattleFieldWidth(), getBattleFieldHeight());
+		// Inicializa peek como falso
+		peek = false;
 
-            execute();
-			//Este método é chamado para executar todas as ações especificadas anteriormente. Ele permite que o Robocode processe os comandos e atualize o estado do robô.
-        }
-    }
+		// Vira à esquerda para uma parede.
+		// getHeading() % 90 significa o resto de
+		// getHeading() dividido por 90.
+		turnLeft(getHeading() % 90);
+		ahead(moveAmount);
+		// Vira a arma para virar à direita 90 graus.
+		peek = true;
+		turnGunRight(90);
+		turnRight(90);
 
-    /**
-     * onScannedRobot: O que fazer quando você vê outro robô
-     */
-    public void onScannedRobot(ScannedRobotEvent e) {
-        double bearing = e.getBearing();
-        double enemyHeading = e.getHeading();
-        double absoluteBearing = getHeading() + bearing;
-        double enemyRelativeHeading = absoluteBearing - enemyHeading;
-
-        // Implementação de mira preditiva
-        double bulletPower = 1 + Math.min(2, Math.max(0, (getEnergy() - 20) / 20));
-        double futureX = getX() + e.getDistance() * Math.sin(Math.toRadians(absoluteBearing + e.getHeading()));
-        double futureY = getY() + e.getDistance() * Math.cos(Math.toRadians(absoluteBearing + e.getHeading()));
-        double absDeg = absoluteBearing + e.getHeading();
-        setTurnGunRight(normalizeBearing(absDeg - getGunHeading()));
-
-        // Verifica se o inimigo está parado ou se a diferença entre os ângulos é pequena
-        if (e.getVelocity() == 0 || Math.abs(enemyRelativeHeading) <= 5) {
-            // Se estiver parado ou em movimento linear, atire com mais precisão
-            setFire(bulletPower);
-        } else {
-            // Se estiver em movimento circular, atire com menos precisão
-            setFire(0.8 * bulletPower);
-        }
-
-        lastEnemyEnergy = e.getEnergy();
-    }
-
-    private double normalizeBearing(double angle) {
-        while (angle > 180) angle -= 360;
-        while (angle < -180) angle += 360;
-        return angle;
-    }
-
-    /**
+		while (true) {
+			// Olha antes de virar quando ahead() completa.
+			peek = true;
+			// Move pela parede
+			ahead(moveAmount);
+			// Não olha agora
+			peek = false;
+			// Vira para a próxima parede
+			turnRight(90);
+		}
+	}
+/**
      * onHitByBullet: O que fazer quando você é atingido por uma bala
      */
     public void onHitByBullet(HitByBulletEvent e) {
-        hitByBullet = true;
-        consecutiveHits = 0;
-        smartEvasion();
+      back(50);
     }
+	/**
+	 * onHitRobot: Move para trás um pouco.
+	 */
+	public void onHitRobot(HitRobotEvent e) {
+		// Se ele está na frente de nós, recua um pouco.
+		if (e.getBearing() > -90 && e.getBearing() < 90) {
+			back(100);
+		} // caso contrário, ele está atrás de nós, então avança um pouco.
+		else {
+			ahead(100);
+		}
+	}
 
-    /**
-     * onHitWall: O que fazer quando você atinge uma parede
-     */
-    public void onHitWall(HitWallEvent e) {
-        reverseDirection();
-    }
-
-    /**
-     * onHitRobot: O que fazer quando você atinge outro robô
-     */
-    public void onHitRobot(HitRobotEvent e) {
-        double bearing = e.getBearing(); //Obtém o ângulo de direção do robô atingido em relação ao meu robô.
-
-        if (Math.abs(bearing) <= 90) { //Verifica se o ângulo de direção absoluto do robô atingido é menor ou igual a 90 graus. Isso indica uma colisão frontal ou lateral.
-            // Colisão frontal ou lateral, movimento lateral para evitar tiros
-            setTurnRight(90);
-            setAhead(50);
-            fire(3);
-            consecutiveHits++; //Incrementa o contador de colisões consecutivas.
-        } else {
-            // Colisão pela retaguarda, mira e atira diretamente contra o inimigo
-            setTurnGunRight(normalizeBearing(bearing - getGunHeading()));
-			//Ajusta a mira da arma para apontar diretamente para o robô atingido.
-            setAhead(50);
-            fire(1);
-            consecutiveHits++; ////Incrementa o contador de colisões consecutivas.
-        }
-    }
-
-    private void smartEvasion() {
-        double energy = getEnergy();
-		// Obter energia atual do robô
-
-        if (consecutiveHits >= 3 || energy < 50) {
-            // Se consecutivamente atingido 3 vezes e a energia for menor que 50 , evasão mais defensiva
-            turnRight(180);
-            ahead(200);
-            turnRight(180);
-            consecutiveHits = 0; //zera o contador de hits consecutivos
-        } else {
-            turnRight(90);
-            ahead(150);
-            turnLeft(90);
-            ahead(150);
-        }
-        hitByBullet = false; // atualiza para falso após evasão
-    }
-
-    private void reverseDirection() {
-        angulo = !angulo; 
-		// inverte o angulo de true para false
-    }
+	/**
+	 * onScannedRobot: Atira
+	 */
+	public void onScannedRobot(ScannedRobotEvent e) {
+		fire(2);
+		// Scan é chamado automaticamente quando o robô está se movendo.
+		// Chamando manualmente aqui, garantimos que geramos outro evento de scan se houver um robô na próxima
+		// parede, para que não comecemos a subir até que ele tenha ido embora.
+		if (peek) {
+			scan();
+		}
+	}
+	 
 }
