@@ -54,18 +54,27 @@ public class MID_SQUAD extends AdvancedRobot {
     }
     ahead(50); // Move para frente
 }
-	public void onHitRobot(HitRobotEvent e) {
-		// Verifica a direção do robô que colidiu
+public void onHitRobot(HitRobotEvent e) {
+    // Verifica se há robôs inimigos na frente antes de recuar
+    if (getOthers() > 0 && e.getBearing() < 0) {
+        // Robô colidiu na parte frontal, recua um pouco
+        turnLeft(90);
+        back(100);
+    } else {
+        // Adiciona aleatoriedade ao ângulo de giro
+        int randomAngle = (int) (Math.random() * 90) - 45;
+        turnRight(randomAngle);
+        
+        // Verifica a direção do robô que colidiu
         if (Math.abs(e.getBearing()) > 90) {
             // Robô colidiu na parte traseira, então avança um pouco
-            turnRight(45); // Gira para a direita antes de avançar
             ahead(100);
         } else {
             // Robô colidiu na parte frontal, então recua um pouco
-            turnLeft(45); // Gira para a esquerda antes de recuar
             back(100);
         }
-	}
+    }
+}
 
 	/**
 	 * onScannedRobot: Atira
