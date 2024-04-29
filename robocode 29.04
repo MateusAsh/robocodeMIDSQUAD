@@ -1,0 +1,98 @@
+package cs;
+
+import robocode.*;
+import java.awt.Color;
+//Mateus, Ingrid e Deryk
+
+public class MID_SQUAD extends AdvancedRobot {
+
+    boolean peek; // Não virar se tiver um robô
+    double moveAmount; // Quanto mover
+    double ultimaVelocidadeDaBala;
+    double ultimaDirecaoDaBala;
+
+    /**
+     * run: Move ao redor das paredes
+     */
+    public void run() {
+        setColors(Color.magenta, Color.magenta, Color.magenta); // corpo, arma, radar
+
+        // Inicializa moveAmount para o máximo possível para este campo de batalha.
+        moveAmount = Math.max(getBattleFieldWidth(), getBattleFieldHeight());
+        // Inicializa peek como falso
+        peek = false;
+
+        // Vira à esquerda para uma parede.
+        // getHeading() % 90 significa o resto de
+        // getHeading() dividido por 90.
+        turnLeft(getHeading() % 90);
+        ahead(moveAmount);
+        // Vira a arma para virar à direita 90 graus.
+        peek = true;
+        turnGunRight(90);
+        turnRight(90);
+
+        while (true) {
+            executePreditivo();
+            // Olha antes de virar quando ahead() completa.
+            peek = true;
+            // Move pela parede
+            ahead(moveAmount);
+            // Não olha agora
+            peek = false;
+            // Vira para a próxima parede
+            turnRight(90);
+        }
+    }
+
+    /**
+     * onHitByBullet: O que fazer quando você é atingido por uma bala
+     */
+    public void onHitByBullet(HitByBulletEvent event) {
+        // Salva a velocidade e direção da bala que atingiu o robô
+        ultimaVelocidadeDaBala = event.getVelocity();
+        ultimaDirecaoDaBala = event.getHeadingRadians();
+    }
+
+    public void executePreditivo() {
+        // Calcula a posição futura da bala
+        double x = getX() + ultimaVelocidadeDaBala * Math.sin(ultimaDirecaoDaBala);
+        double y = getY() + ultimaVelocidadeDaBala * Math.cos(ultimaDirecaoDaBala);
+
+        // Calcula a distância entre o robô e a posição futura da bala
+        double distancia = Math.sqrt(Math.pow(getX() - x, 2) + Math.pow(getY() - y, 2));
+
+        // Se a distância for pequena o suficiente, vire para evitar a bala
+        if (distancia < 100) {
+            setTurnRightRadians(Math.atan2(x - getX(), y - getY()));
+            setAhead(100);
+            execute();
+        }
+    }
+
+    /**
+     * onHitRobot: Move para trás um pouco.
+     */
+    public void onHitRobot(HitRobotEvent e) {
+        // Se ele está na frente de nós, recua um pouco.
+        if (e.getBearing() > -90 && e.getBearing() < 90) {
+            back(100);
+        } else { // caso contrário, ele está atrás de nós, então avança um pouco.
+            ahead(50); // Move para frente
+        }
+    }
+
+    /**
+     * onScannedRobot: Atira
+     */
+    public void onScannedRobot(ScannedRobotEvent e) {
+        String robotank = e.getName();
+        double distancia = e.getDistance();
+        System.out.println(robotank + " distância " + distancia);
+        if (distancia < 135) {
+            fire(3);
+        } else {
+            fire(1);
+        }
+    }
+}
